@@ -140,3 +140,51 @@ impl<T> StaticCell<T> {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    #[should_panic(expected = "`StaticCell` is not initialized")]
+    fn cannot_take_uninitialized() {
+        static CELL: StaticCell<()> = StaticCell::new();
+        let _ = CELL.take();
+    }
+
+    #[test]
+    #[should_panic(expected = "`StaticCell` cannot be initialized twice")]
+    fn cannot_init_twice() {
+        static CELL: StaticCell<()> = StaticCell::new();
+        CELL.init(());
+        CELL.init_with(|| ());
+    }
+
+    #[test]
+    fn cannot_take_twice() {
+        static CELL: StaticCell<()> = StaticCell::new_with_value(());
+
+        assert!(CELL.take().is_some());
+        assert!(CELL.take().is_none());
+    }
+
+    #[test]
+    fn can_init_restore_take() {
+        static CELL: StaticCell<()> = StaticCell::new();
+        let value = CELL.init(());
+        assert!(CELL.take().is_none());
+        CELL.restore(value);
+        assert!(CELL.take().is_some());
+    }
+
+    #[test]
+    #[should_panic(expected = "value does not belong to this `StaticCell`")]
+    fn cannot_restore_different() {
+        static CELL1: StaticCell<()> = StaticCell::new_with_value(());
+        static CELL2: StaticCell<()> = StaticCell::new_with_value(());
+        let value1 = CELL1.take().unwrap();
+        let _ = CELL2.take();
+
+        CELL2.restore(value1);
+    }
+}
