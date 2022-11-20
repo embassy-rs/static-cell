@@ -33,6 +33,7 @@ assert_eq!(*x, 42);
 
 - If you can use `alloc`, you can use `Box::leak()`.
 - If you're OK with `unsafe`, you can use `static mut THING: MaybeUninit<T>`.
+- [once_cell](https://crates.io/crates/once_cell) (or most of its related crates) provides a superset of this crate's functionality, e.g. in its [safe initialization for global data](https://docs.rs/once_cell/latest/once_cell/#safe-initialization-of-global-data) recipe, but needs explicit opt-in to atomic-polyfill and opt-out of std.
 
 ## Interoperability
 
