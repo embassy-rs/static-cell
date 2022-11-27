@@ -55,7 +55,8 @@ impl<T> StaticCell<T> {
     #[inline]
     #[allow(clippy::mut_from_ref)]
     pub fn init_with(&'static self, val: impl FnOnce() -> T) -> &'static mut T {
-        self.try_init_with(val).expect("StaticCell::init() called multiple times")
+        self.try_init_with(val)
+            .expect("StaticCell::init() called multiple times")
     }
 
     /// Optionally initialize the `StaticCell` with the closure's return value, returning a mutable reference to it.
@@ -64,8 +65,7 @@ impl<T> StaticCell<T> {
     #[inline]
     #[allow(clippy::mut_from_ref)]
     pub fn try_init_with(&'static self, val: impl FnOnce() -> T) -> Option<&'static mut T> {
-        self
-            .used
+        self.used
             .compare_exchange(false, true, Ordering::Acquire, Ordering::Relaxed)
             .ok()
             .map(|_| {
