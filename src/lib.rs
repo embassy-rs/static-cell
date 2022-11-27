@@ -77,6 +77,30 @@ impl<T> StaticCell<T> {
         }
     }
 
+    /// Initialize the `StaticCell` with a value, returning a mutable reference to it,
+    /// if no value is stored in it yet.
+    ///
+    /// Using this method, the compiler usually constructs `val` in the stack and then moves
+    /// it into the `StaticCell`. If `T` is big, this is likely to cause stack overflows.
+    /// Considering using [`StaticCell::try_init_with`] instead, which will construct it in-place inside the `StaticCell`.
+    ///
+    /// Will only return a Some(&'static mut T) when the `StaticCell` was not yet initialized.
+    #[inline]
+    #[allow(clippy::mut_from_ref)]
+    pub fn try_init(&'static self, val: T) -> Option<&'static mut T> {
+        Some(self.try_uninit()?.write(val))
+    }
+
+    /// Initialize the `StaticCell` with the closure's return value, returning a mutable reference to it,
+    /// if no value is stored in it yet.
+    ///
+    /// Will only return a Some(&'static mut T) when the `StaticCell` was not yet initialized.
+    #[inline]
+    #[allow(clippy::mut_from_ref)]
+    pub fn try_init_with(&'static self, val: impl FnOnce() -> T) -> Option<&'static mut T> {
+        Some(self.try_uninit()?.write(val()))
+    }
+
     /// Returns a mutable reference to the uninitialized data owned by the `StaticCell`,
     /// if no value is stored in it yet.
     ///
