@@ -55,15 +55,22 @@ impl<T> StaticCell<T> {
     #[inline]
     #[allow(clippy::mut_from_ref)]
     pub fn init_with(&'static self, val: impl FnOnce() -> T) -> &'static mut T {
-        if self
-            .used
-            .compare_exchange(false, true, Ordering::Acquire, Ordering::Relaxed)
-            .is_err()
-        {
-            panic!("StaticCell::init() called multiple times");
-        }
+        self.try_init_with(val)
+            .expect("StaticCell::init() called multiple times")
+    }
 
-        let p: &mut MaybeUninit<T> = unsafe { &mut *self.val.get() };
-        p.write(val())
+    /// Optionally initialize the `StaticCell` with the closure's return value, returning a mutable reference to it.
+    ///
+    /// Will only return a Some(&'static mut T) when the `StaticCell` was not yet initialized.
+    #[inline]
+    #[allow(clippy::mut_from_ref)]
+    pub fn try_init_with(&'static self, val: impl FnOnce() -> T) -> Option<&'static mut T> {
+        self.used
+            .compare_exchange(false, true, Ordering::Acquire, Ordering::Relaxed)
+            .ok()
+            .map(|_| {
+                let p: &mut MaybeUninit<T> = unsafe { &mut *self.val.get() };
+                p.write(val())
+            })
     }
 }
