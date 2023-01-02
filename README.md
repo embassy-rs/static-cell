@@ -33,6 +33,7 @@ assert_eq!(*x, 42);
 
 - If you can use `alloc`, you can use `Box::leak()`.
 - If you're OK with `unsafe`, you can use `static mut THING: MaybeUninit<T>`.
+- If you need just `&'static T` (instead of `&'static mut T`), there's [once_cell](https://crates.io/crates/once_cell).
 
 ## Interoperability
 
