@@ -41,7 +41,7 @@ impl<T> StaticCell<T> {
     #[inline]
     #[allow(clippy::mut_from_ref)]
     pub fn init(&'static self, val: T) -> &'static mut T {
-        self.init_with(|| val)
+        self.uninit().write(val)
     }
 
     /// Initialize the `StaticCell` with the closure's return value, returning a mutable reference to it.
@@ -55,6 +55,20 @@ impl<T> StaticCell<T> {
     #[inline]
     #[allow(clippy::mut_from_ref)]
     pub fn init_with(&'static self, val: impl FnOnce() -> T) -> &'static mut T {
+        self.uninit().write(val())
+    }
+
+    /// Returns a mutable reference to the uninitialized data owned by the `StaticCell`.
+    ///
+    /// Using this method directly is not recommended, but it can be used to construct `T` in-place directly
+    /// in a guaranteed fashion.
+    ///
+    /// # Panics
+    ///
+    /// Panics if this `StaticCell` already has a value stored in it.
+    #[inline]
+    #[allow(clippy::mut_from_ref)]
+    pub fn uninit(&'static self) -> &'static mut MaybeUninit<T> {
         if self
             .used
             .compare_exchange(false, true, Ordering::Acquire, Ordering::Relaxed)
@@ -63,7 +77,6 @@ impl<T> StaticCell<T> {
             panic!("StaticCell::init() called multiple times");
         }
 
-        let p: &mut MaybeUninit<T> = unsafe { &mut *self.val.get() };
-        p.write(val())
+        unsafe { &mut *self.val.get() }
     }
 }
