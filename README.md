@@ -1,7 +1,7 @@
 # static-cell
-[![crates.io](https://img.shields.io/crates/d/static-cell.svg)](https://crates.io/crates/static-cell)
-[![crates.io](https://img.shields.io/crates/v/static-cell.svg)](https://crates.io/crates/static-cell)
-[![Documentation](https://docs.rs/static-cell/badge.svg)](https://docs.rs/static-cell)
+[![crates.io](https://img.shields.io/crates/d/static_cell.svg)](https://crates.io/crates/static_cell)
+[![crates.io](https://img.shields.io/crates/v/static_cell.svg)](https://crates.io/crates/static_cell)
+[![Documentation](https://docs.rs/static_cell/badge.svg)](https://docs.rs/static_cell)
 
 Statically allocated, initialized at runtime cell.
 
