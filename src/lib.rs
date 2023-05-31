@@ -1,5 +1,6 @@
 #![no_std]
 #![doc = include_str!("../README.md")]
+#![cfg_attr(docsrs, feature(doc_cfg))]
 
 use core::cell::UnsafeCell;
 use core::mem::MaybeUninit;
@@ -79,4 +80,22 @@ impl<T> StaticCell<T> {
 
         unsafe { &mut *self.val.get() }
     }
+}
+
+/// Convert a `T` to a `&'static mut T`.
+///
+/// The macro declares a `static StaticCell` and then initializes it when run, returning the `&'static mut`.
+/// Therefore, each instance can only be run once. Next runs will panic.
+///
+/// This macro is nightly-only. It requires `#![feature(type_alias_impl_trait)]` in the crate using it.
+#[cfg(feature = "nightly")]
+#[cfg_attr(docsrs, doc(cfg(feature = "nightly")))]
+#[macro_export]
+macro_rules! make_static {
+    ($val:expr) => {{
+        type T = impl ::core::marker::Sized;
+        static STATIC_CELL: $crate::StaticCell<T> = $crate::StaticCell::new();
+        let (x,) = unsafe { STATIC_CELL.uninit().write(($val,)) };
+        x
+    }};
 }

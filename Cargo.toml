@@ -8,3 +8,10 @@ repository = "https://github.com/embassy-rs/static-cell"
 
 [dependencies]
 atomic-polyfill = "1.0.1"
+
+[features]
+nightly = []
+
+[package.metadata.docs.rs]
+features = ["nightly"]
+rustdoc-args = ["--cfg", "docsrs"]
