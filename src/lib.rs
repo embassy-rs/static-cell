@@ -85,16 +85,38 @@ impl<T> StaticCell<T> {
 /// Convert a `T` to a `&'static mut T`.
 ///
 /// The macro declares a `static StaticCell` and then initializes it when run, returning the `&'static mut`.
-/// Therefore, each instance can only be run once. Next runs will panic.
+/// Therefore, each instance can only be run once. Next runs will panic. The `static` can additionally be
+/// decorated with attributes, such as `#[link_section]`, `#[used]`, et al.
 ///
 /// This macro is nightly-only. It requires `#![feature(type_alias_impl_trait)]` in the crate using it.
+///
+/// # Examples
+///
+/// ```
+/// # #![feature(type_alias_impl_trait)]
+/// use static_cell::make_static;
+///
+/// # fn main() {
+/// let x: &'static mut u32 = make_static!(42);
+///
+/// // This attribute instructs the linker to allocate it in the external RAM's BSS segment.
+/// // This specific example is for ESP32S3 with PSRAM support.
+/// let buf = make_static!([0u8; 4096], #[link_section = ".ext_ram.bss.buf"]);
+///
+/// // Multiple attributes can be supplied.
+/// let s = make_static!(0usize, #[used] #[export_name = "exported_symbol_name"]);
+/// # }
+/// ```
 #[cfg(feature = "nightly")]
 #[cfg_attr(docsrs, doc(cfg(feature = "nightly")))]
 #[macro_export]
 macro_rules! make_static {
-    ($val:expr) => {{
+    ($val:expr) => ($crate::make_static!($val, ));
+    ($val:expr, $(#[$m:meta])*) => {{
         type T = impl ::core::marker::Sized;
+        $(#[$m])*
         static STATIC_CELL: $crate::StaticCell<T> = $crate::StaticCell::new();
+        #[deny(unused_attributes)]
         let (x,) = unsafe { STATIC_CELL.uninit().write(($val,)) };
         x
     }};
