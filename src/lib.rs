@@ -70,15 +70,31 @@ impl<T> StaticCell<T> {
     #[inline]
     #[allow(clippy::mut_from_ref)]
     pub fn uninit(&'static self) -> &'static mut MaybeUninit<T> {
+        if let Some(val) = self.try_uninit() {
+            val
+        } else {
+            panic!("`StaticCell` cannot be initialized twice");
+        }
+    }
+
+    /// Returns a mutable reference to the uninitialized data owned by the `StaticCell`,
+    /// if no value is stored in it yet.
+    ///
+    /// Using this method directly is not recommended, but it can be used to construct `T` in-place directly
+    /// in a guaranteed fashion.
+    #[inline]
+    pub fn try_uninit(&'static self) -> Option<&'static mut MaybeUninit<T>> {
         if self
             .used
             .compare_exchange(false, true, Ordering::Acquire, Ordering::Relaxed)
-            .is_err()
+            .is_ok()
         {
-            panic!("StaticCell::init() called multiple times");
+            // SAFETY: We just checked that the value is not yet taken and marked it as taken.
+            let val = unsafe { &mut *self.val.get() };
+            Some(val)
+        } else {
+            None
         }
-
-        unsafe { &mut *self.val.get() }
     }
 }
 
