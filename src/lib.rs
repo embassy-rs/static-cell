@@ -9,6 +9,10 @@ use atomic_polyfill::{AtomicBool, Ordering};
 
 /// Statically allocated, initialized at runtime cell.
 ///
+/// It has two states: "empty" and "full". It is created "empty", and obtaining a reference
+/// to the contents permanently changes it to "full". This allows that reference to be valid
+/// forever.
+///
 /// See the [crate-level docs](crate) for usage.
 pub struct StaticCell<T> {
     used: AtomicBool,
@@ -19,9 +23,9 @@ unsafe impl<T> Send for StaticCell<T> {}
 unsafe impl<T> Sync for StaticCell<T> {}
 
 impl<T> StaticCell<T> {
-    /// Create a new, uninitialized `StaticCell`.
+    /// Create a new, empty `StaticCell`.
     ///
-    /// It can be initialized at runtime with [`StaticCell::init()`].
+    /// It can be initialized at runtime with [`StaticCell::init()`] or similar methods.
     #[inline]
     pub const fn new() -> Self {
         Self {
@@ -38,7 +42,7 @@ impl<T> StaticCell<T> {
     ///
     /// # Panics
     ///
-    /// Panics if this `StaticCell` already has a value stored in it.
+    /// Panics if this `StaticCell` is already full.
     #[inline]
     #[allow(clippy::mut_from_ref)]
     pub fn init(&'static self, val: T) -> &'static mut T {
@@ -52,33 +56,34 @@ impl<T> StaticCell<T> {
     ///
     /// # Panics
     ///
-    /// Panics if this `StaticCell` already has a value stored in it.
+    /// Panics if this `StaticCell` is already full.
     #[inline]
     #[allow(clippy::mut_from_ref)]
     pub fn init_with(&'static self, val: impl FnOnce() -> T) -> &'static mut T {
         self.uninit().write(val())
     }
 
-    /// Returns a mutable reference to the uninitialized data owned by the `StaticCell`.
+    /// Return a mutable reference to the uninitialized memory owned by the `StaticCell`.
     ///
     /// Using this method directly is not recommended, but it can be used to construct `T` in-place directly
     /// in a guaranteed fashion.
     ///
     /// # Panics
     ///
-    /// Panics if this `StaticCell` already has a value stored in it.
+    /// Panics if this `StaticCell` is already full.
     #[inline]
     #[allow(clippy::mut_from_ref)]
     pub fn uninit(&'static self) -> &'static mut MaybeUninit<T> {
         if let Some(val) = self.try_uninit() {
             val
         } else {
-            panic!("`StaticCell` cannot be initialized twice");
+            panic!("`StaticCell` is already full, it can't be initialized twice.");
         }
     }
 
-    /// Initialize the `StaticCell` with a value, returning a mutable reference to it,
-    /// if no value is stored in it yet.
+    /// Try initializing the `StaticCell` with a value, returning a mutable reference to it.
+    ///
+    /// If this `StaticCell` is already full, it returns `None`.
     ///
     /// Using this method, the compiler usually constructs `val` in the stack and then moves
     /// it into the `StaticCell`. If `T` is big, this is likely to cause stack overflows.
@@ -91,18 +96,22 @@ impl<T> StaticCell<T> {
         Some(self.try_uninit()?.write(val))
     }
 
-    /// Initialize the `StaticCell` with the closure's return value, returning a mutable reference to it,
-    /// if no value is stored in it yet.
+    /// Try initializing the `StaticCell` with the closure's return value, returning a mutable reference to it.
     ///
-    /// Will only return a Some(&'static mut T) when the `StaticCell` was not yet initialized.
+    /// If this `StaticCell` is already full, it returns `None`.
+    ///
+    /// The advantage over [`StaticCell::init`] is that this method allows the closure to construct
+    /// the `T` value in-place directly inside the `StaticCell`, saving stack space.
+    ///
     #[inline]
     #[allow(clippy::mut_from_ref)]
     pub fn try_init_with(&'static self, val: impl FnOnce() -> T) -> Option<&'static mut T> {
         Some(self.try_uninit()?.write(val()))
     }
 
-    /// Returns a mutable reference to the uninitialized data owned by the `StaticCell`,
-    /// if no value is stored in it yet.
+    /// Try returning a mutable reference to the uninitialized memory owned by the `StaticCell`.
+    ///
+    /// If this `StaticCell` is already full, it returns `None`.
     ///
     /// Using this method directly is not recommended, but it can be used to construct `T` in-place directly
     /// in a guaranteed fashion.
