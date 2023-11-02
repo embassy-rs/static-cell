@@ -1,13 +1,13 @@
 [package]
 name = "static_cell"
-version = "1.3.0"
+version = "2.0.0"
 edition = "2021"
 description = "Statically allocated, initialized at runtime cell."
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/embassy-rs/static-cell"
 
 [dependencies]
-portable-atomic = { version = "1.5.1", features = ["critical-section"] }
+portable-atomic = { version = "1.5.1" }
 
 [features]
 nightly = []
