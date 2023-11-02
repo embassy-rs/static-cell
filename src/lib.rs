@@ -5,7 +5,7 @@
 use core::cell::UnsafeCell;
 use core::mem::MaybeUninit;
 
-use atomic_polyfill::{AtomicBool, Ordering};
+use portable_atomic::{AtomicBool, Ordering};
 
 /// Statically allocated, initialized at runtime cell.
 ///
