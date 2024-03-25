@@ -37,7 +37,7 @@ assert_eq!(*x, 42);
 
 ## Interoperability
 
-This crate uses [`atomic-polyfill`](https://github.com/embassy-rs/atomic-polyfill), so on targets without native
+This crate uses [`portable-atomic`](https://crates.io/crates/portable-atomic), so on targets without native
 atomics you must import a crate that provides a [`critical-section`](https://github.com/rust-embedded/critical-section) 
 implementation. See the `critical-section` README for details.
 
