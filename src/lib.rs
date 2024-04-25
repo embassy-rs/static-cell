@@ -185,6 +185,7 @@ impl<T> ConstInitCell<T> {
         }
     }
 
+    /// Try to take the `ConstInitCell`, returning None if it was already taken
     #[inline]
     #[allow(clippy::mut_from_ref)]
     pub fn try_take(&'static self) -> Option<&'static mut T> {
