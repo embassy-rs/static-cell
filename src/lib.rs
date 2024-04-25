@@ -138,7 +138,7 @@ impl<T> StaticCell<T> {
 
 /// Statically allocated and initialized, taken at runtime cell.
 ///
-/// It has two states: "untake" and "taken". It is created "untake", and obtaining a reference
+/// It has two states: "untaken" and "taken". It is created "untaken", and obtaining a reference
 /// to the contents permanently changes it to "taken". This allows that reference to be valid
 /// forever.
 ///
