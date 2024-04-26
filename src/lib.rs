@@ -13,6 +13,9 @@ use portable_atomic::{AtomicBool, Ordering};
 /// to the contents permanently changes it to "full". This allows that reference to be valid
 /// forever.
 ///
+/// If your value can be initialized as a `const` value, consider using [`ConstStaticCell`]
+/// instead if you only need to take the value at runtime.
+///
 /// See the [crate-level docs](crate) for usage.
 pub struct StaticCell<T> {
     used: AtomicBool,
@@ -119,6 +122,75 @@ impl<T> StaticCell<T> {
     pub fn try_uninit(&'static self) -> Option<&'static mut MaybeUninit<T>> {
         if self
             .used
+            .compare_exchange(false, true, Ordering::Acquire, Ordering::Relaxed)
+            .is_ok()
+        {
+            // SAFETY: We just checked that the value is not yet taken and marked it as taken.
+            let val = unsafe { &mut *self.val.get() };
+            Some(val)
+        } else {
+            None
+        }
+    }
+}
+
+// ---
+
+/// Statically allocated and initialized, taken at runtime cell.
+///
+/// It has two states: "untaken" and "taken". It is created "untaken", and obtaining a reference
+/// to the contents permanently changes it to "taken". This allows that reference to be valid
+/// forever.
+///
+/// If your value can be const defined, for example a large, zero filled buffer used for DMA
+/// or other scratch memory usage, `ConstStaticCell` can be used to guarantee the initializer
+/// will never take up stack memory.
+///
+/// If your values are all zero initialized, the resulting `ConstStaticCell` should be placed
+/// in `.bss`, not taking flash space for initialization either.
+///
+/// See the [crate-level docs](crate) for usage.
+pub struct ConstStaticCell<T> {
+    taken: AtomicBool,
+    val: UnsafeCell<T>,
+}
+
+unsafe impl<T> Send for ConstStaticCell<T> {}
+unsafe impl<T> Sync for ConstStaticCell<T> {}
+
+impl<T> ConstStaticCell<T> {
+    /// Create a new, empty `ConstStaticCell`.
+    ///
+    /// It can be taken at runtime with [`ConstStaticCell::take()`] or similar methods.
+    #[inline]
+    pub const fn new(value: T) -> Self {
+        Self {
+            taken: AtomicBool::new(false),
+            val: UnsafeCell::new(value),
+        }
+    }
+
+    /// Take the `ConstStaticCell`, returning a mutable reference to it.
+    ///
+    /// # Panics
+    ///
+    /// Panics if this `ConstStaticCell` was already taken.
+    #[inline]
+    #[allow(clippy::mut_from_ref)]
+    pub fn take(&'static self) -> &'static mut T {
+        if let Some(val) = self.try_take() {
+            val
+        } else {
+            panic!("`ConstStaticCell` is already taken, it can't be taken twice")
+        }
+    }
+
+    /// Try to take the `ConstStaticCell`, returning None if it was already taken
+    #[inline]
+    #[allow(clippy::mut_from_ref)]
+    pub fn try_take(&'static self) -> Option<&'static mut T> {
+        if self
+            .taken
             .compare_exchange(false, true, Ordering::Acquire, Ordering::Relaxed)
             .is_ok()
         {
