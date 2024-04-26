@@ -13,7 +13,7 @@ use portable_atomic::{AtomicBool, Ordering};
 /// to the contents permanently changes it to "full". This allows that reference to be valid
 /// forever.
 ///
-/// If your value can be initialized as a `const` value, consider using [`ConstInitCell`]
+/// If your value can be initialized as a `const` value, consider using [`ConstStaticCell`]
 /// instead if you only need to take the value at runtime.
 ///
 /// See the [crate-level docs](crate) for usage.
@@ -143,25 +143,25 @@ impl<T> StaticCell<T> {
 /// forever.
 ///
 /// If your value can be const defined, for example a large, zero filled buffer used for DMA
-/// or other scratch memory usage, `ConstInitCell` can be used to guarantee the initializer
+/// or other scratch memory usage, `ConstStaticCell` can be used to guarantee the initializer
 /// will never take up stack memory.
 ///
-/// If your values are all zero initialized, the resulting `ConstInitCell` should be placed
+/// If your values are all zero initialized, the resulting `ConstStaticCell` should be placed
 /// in `.bss`, not taking flash space for initialization either.
 ///
 /// See the [crate-level docs](crate) for usage.
-pub struct ConstInitCell<T> {
+pub struct ConstStaticCell<T> {
     taken: AtomicBool,
     val: UnsafeCell<T>,
 }
 
-unsafe impl<T> Send for ConstInitCell<T> {}
-unsafe impl<T> Sync for ConstInitCell<T> {}
+unsafe impl<T> Send for ConstStaticCell<T> {}
+unsafe impl<T> Sync for ConstStaticCell<T> {}
 
-impl<T> ConstInitCell<T> {
-    /// Create a new, empty `ConstInitCell`.
+impl<T> ConstStaticCell<T> {
+    /// Create a new, empty `ConstStaticCell`.
     ///
-    /// It can be taken at runtime with [`ConstInitCell::take()`] or similar methods.
+    /// It can be taken at runtime with [`ConstStaticCell::take()`] or similar methods.
     #[inline]
     pub const fn new(value: T) -> Self {
         Self {
@@ -170,22 +170,22 @@ impl<T> ConstInitCell<T> {
         }
     }
 
-    /// Take the `ConstInitCell`, returning a mutable reference to it.
+    /// Take the `ConstStaticCell`, returning a mutable reference to it.
     ///
     /// # Panics
     ///
-    /// Panics if this `ConstInitCell` was already taken.
+    /// Panics if this `ConstStaticCell` was already taken.
     #[inline]
     #[allow(clippy::mut_from_ref)]
     pub fn take(&'static self) -> &'static mut T {
         if let Some(val) = self.try_take() {
             val
         } else {
-            panic!("`ConstInitCell` is already taken, it can't be taken twice")
+            panic!("`ConstStaticCell` is already taken, it can't be taken twice")
         }
     }
 
-    /// Try to take the `ConstInitCell`, returning None if it was already taken
+    /// Try to take the `ConstStaticCell`, returning None if it was already taken
     #[inline]
     #[allow(clippy::mut_from_ref)]
     pub fn try_take(&'static self) -> Option<&'static mut T> {
