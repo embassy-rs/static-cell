@@ -238,7 +238,7 @@ macro_rules! make_static {
         $(#[$m])*
         static STATIC_CELL: $crate::StaticCell<T> = $crate::StaticCell::new();
         #[deny(unused_attributes)]
-        let (x,) = unsafe { STATIC_CELL.uninit().write(($val,)) };
+        let (x,) = STATIC_CELL.uninit().write(($val,));
         x
     }};
 }
