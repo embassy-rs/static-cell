@@ -7,10 +7,11 @@ license = "MIT OR Apache-2.0"
 repository = "https://github.com/embassy-rs/static-cell"
 
 [dependencies]
-portable-atomic = { version = "1.5.1" }
+portable-atomic = "1.6.0"
 
 [features]
 nightly = []
+critical-section = ["portable-atomic/critical-section"]
 
 [package.metadata.docs.rs]
 features = ["nightly"]
