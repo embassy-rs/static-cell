@@ -23,3 +23,14 @@ jobs:
             override: true
       - name: Test
         run: cargo test
+  test-nightly:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+            toolchain: nightly
+            override: true
+      - name: Test
+        run: cargo test --features nightly
