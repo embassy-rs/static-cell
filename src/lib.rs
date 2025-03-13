@@ -1,6 +1,7 @@
-#![no_std]
+#![cfg_attr(not(test), no_std)]
 #![doc = include_str!("../README.md")]
 #![cfg_attr(docsrs, feature(doc_cfg))]
+#![cfg_attr(feature = "nightly", feature(type_alias_impl_trait))] // for tests
 
 use core::cell::UnsafeCell;
 use core::mem::MaybeUninit;
@@ -241,4 +242,23 @@ macro_rules! make_static {
         let (x,) = STATIC_CELL.uninit().write(($val,));
         x
     }};
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::StaticCell;
+
+    #[test]
+    fn test_static_cell() {
+        static CELL: StaticCell<u32> = StaticCell::new();
+        let val: &'static u32 = CELL.init(42u32);
+        assert_eq!(*val, 42);
+    }
+
+    #[cfg(feature = "nightly")]
+    #[test]
+    fn test_make_static() {
+        let val: &'static u32 = make_static!(42u32);
+        assert_eq!(*val, 42);
+    }
 }
