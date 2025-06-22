@@ -156,8 +156,11 @@ pub struct ConstStaticCell<T> {
     val: UnsafeCell<T>,
 }
 
-unsafe impl<T> Send for ConstStaticCell<T> {}
-unsafe impl<T> Sync for ConstStaticCell<T> {}
+// ConstStaticCell<T> essentially lets you construct a value of T, pass &ConstStaticCell<T> to
+// another thread, and then in that thread obtain a &'static mut T, which is effectively sending
+// the value between threads, therefore T must implement Send.
+unsafe impl<T: Send> Send for ConstStaticCell<T> {}
+unsafe impl<T: Send> Sync for ConstStaticCell<T> {}
 
 impl<T> ConstStaticCell<T> {
     /// Create a new, empty `ConstStaticCell`.
@@ -261,4 +264,44 @@ mod tests {
         let val: &'static u32 = make_static!(42u32);
         assert_eq!(*val, 42);
     }
+}
+
+#[cfg(doctest)]
+mod compile_fail_tests {
+    /// ```compile_fail
+    /// use std::rc::Rc;
+    ///
+    /// use static_cell::ConstStaticCell;
+    ///
+    /// fn main() {
+    ///     let rc = Rc::new(0);
+    ///     let sc = ConstStaticCell::new(rc.clone());
+    ///     let t = std::thread::spawn(move || {
+    ///         let sc = Box::leak(Box::new(sc));
+    ///         let rc: &mut Rc<i32> = sc.take();
+    ///         _ = rc.clone(); // data race!
+    ///     });
+    ///     _ = rc.clone();
+    ///     _ = t.join();
+    /// }
+    /// ```
+    fn send_requires_send() {}
+
+    /// ```compile_fail
+    /// use std::rc::Rc;
+    ///
+    /// use static_cell::ConstStaticCell;
+    ///
+    /// fn main() {
+    ///     let rc = Rc::new(0);
+    ///     let sc = Box::leak(Box::new(ConstStaticCell::new(rc.clone())));
+    ///     let t = std::thread::spawn(|| {
+    ///         let rc: &mut Rc<i32> = sc.take();
+    ///         _ = rc.clone(); // data race!
+    ///     });
+    ///     _ = rc.clone();
+    ///     _ = t.join();
+    /// }
+    /// ```
+    fn sync_requires_send() {}
 }
