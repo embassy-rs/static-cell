@@ -18,6 +18,7 @@ use portable_atomic::{AtomicBool, Ordering};
 /// instead if you only need to take the value at runtime.
 ///
 /// See the [crate-level docs](crate) for usage.
+#[derive(Debug)]
 pub struct StaticCell<T> {
     used: AtomicBool,
     val: UnsafeCell<MaybeUninit<T>>,
@@ -151,6 +152,7 @@ impl<T> StaticCell<T> {
 /// in `.bss`, not taking flash space for initialization either.
 ///
 /// See the [crate-level docs](crate) for usage.
+#[derive(Debug)]
 pub struct ConstStaticCell<T> {
     taken: AtomicBool,
     val: UnsafeCell<T>,
