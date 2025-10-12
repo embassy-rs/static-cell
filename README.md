@@ -33,12 +33,12 @@ assert_eq!(*x, 42);
 
 - If you can use `alloc`, you can use `Box::leak()`.
 - If you're OK with `unsafe`, you can use `static mut THING: MaybeUninit<T>`.
-- If you need just `&'static T` (instead of `&'static mut T`), there's [`OnceCell`](https://doc.rust-lang.org/stable/core/cell/struct.OnceCell.html) (not thread-safe though) or [`OnceLock`](https://doc.rust-lang.org/stable/std/sync/struct.OnceLock.html) (thread-safe, but requires `std`).
+- If you need just `&'static T` (instead of `&'static mut T`), there's [`SharedStaticCell`](https://docs.rs/static-cell/latest/static_cell/struct.SharedStaticCell.html) (which you must initialize before the first access), [`OnceCell`](https://doc.rust-lang.org/stable/core/cell/struct.OnceCell.html) (not thread-safe though) or [`OnceLock`](https://doc.rust-lang.org/stable/std/sync/struct.OnceLock.html) (thread-safe, but requires `std`).
 
 ## Interoperability
 
 This crate uses [`portable-atomic`](https://crates.io/crates/portable-atomic), so on targets without native
-atomics you must import a crate that provides a [`critical-section`](https://github.com/rust-embedded/critical-section) 
+atomics you must import a crate that provides a [`critical-section`](https://github.com/rust-embedded/critical-section)
 implementation. See the `critical-section` README for details.
 
 ## Minimum Supported Rust Version (MSRV)
