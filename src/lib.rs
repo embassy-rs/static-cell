@@ -2,6 +2,7 @@
 #![doc = include_str!("../README.md")]
 #![cfg_attr(docsrs, feature(doc_cfg))]
 #![cfg_attr(feature = "nightly", feature(type_alias_impl_trait))] // for tests
+#![allow(clippy::new_without_default)]
 
 use core::cell::UnsafeCell;
 use core::mem::MaybeUninit;
@@ -121,6 +122,7 @@ impl<T> StaticCell<T> {
     /// Using this method directly is not recommended, but it can be used to construct `T` in-place directly
     /// in a guaranteed fashion.
     #[inline]
+    #[allow(clippy::mut_from_ref)]
     pub fn try_uninit(&'static self) -> Option<&'static mut MaybeUninit<T>> {
         if self
             .used
@@ -209,6 +211,152 @@ impl<T> ConstStaticCell<T> {
     }
 }
 
+// ---
+
+/// Statically allocated, initialized at runtime cell, that allows shared access.
+///
+/// It has two states: "empty" and "full". It is created "empty", and obtaining a reference
+/// to the contents permanently changes it to "full". This allows that reference to be valid
+/// forever.
+///
+/// If your value can be initialized as a `const` value, consider using a plain old static variable.
+#[derive(Debug)]
+pub struct SharedStaticCell<T> {
+    state: AtomicState,
+    val: UnsafeCell<MaybeUninit<T>>,
+}
+
+// Prefer pointer-width atomic operations, as narrower ones may be slower.
+
+#[cfg(all(target_pointer_width = "32", target_has_atomic = "32"))]
+type AtomicState = portable_atomic::AtomicU32;
+#[cfg(not(all(target_pointer_width = "32", target_has_atomic = "32")))]
+type AtomicState = portable_atomic::AtomicU8;
+
+#[cfg(all(target_pointer_width = "32", target_has_atomic = "32"))]
+type StateBits = u32;
+#[cfg(not(all(target_pointer_width = "32", target_has_atomic = "32")))]
+type StateBits = u8;
+
+unsafe impl<T: Sync> Sync for SharedStaticCell<T> {}
+unsafe impl<T: Send> Send for SharedStaticCell<T> {}
+
+impl<T> SharedStaticCell<T> {
+    const STATE_EMPTY: StateBits = 0;
+    const STATE_INITIALIZING: StateBits = 1;
+    const STATE_FULL: StateBits = 2;
+
+    /// Create a new, empty `SharedStaticCell`.
+    ///
+    /// It can be initialized at runtime with [`SharedStaticCell::init()`] or similar methods.
+    #[inline]
+    pub const fn new() -> Self {
+        Self {
+            state: AtomicState::new(Self::STATE_EMPTY),
+            val: UnsafeCell::new(MaybeUninit::uninit()),
+        }
+    }
+
+    /// Initialize the `SharedStaticCell` with a value, returning a shared reference to it.
+    ///
+    /// Using this method, the compiler usually constructs `val` in the stack and then moves
+    /// it into the `SharedStaticCell`. If `T` is big, this is likely to cause stack overflows.
+    /// Considering using [`SharedStaticCell::init_with`] instead, which will construct it in-place inside the `SharedStaticCell`.
+    ///
+    /// # Panics
+    ///
+    /// Panics if this `SharedStaticCell` is already full.
+    #[inline]
+    pub fn init(&'static self, val: T) -> &'static T {
+        self.init_with(|| val)
+    }
+
+    /// Initialize the `SharedStaticCell` with the closure's return value, returning a shared reference to it.
+    ///
+    /// The advantage over [`SharedStaticCell::init`] is that this method allows the closure to construct
+    /// the `T` value in-place directly inside the `SharedStaticCell`, saving stack space.
+    ///
+    /// # Panics
+    ///
+    /// Panics if this `SharedStaticCell` is already full.
+    #[inline]
+    pub fn init_with(&'static self, val: impl FnOnce() -> T) -> &'static T {
+        self.try_init_with(val)
+            .expect("SharedStaticCell is already full, it cannot be initialized twice.")
+    }
+
+    /// Try initializing the `SharedStaticCell` with a value, returning a shared reference to it.
+    ///
+    /// Using this method, the compiler usually constructs `val` in the stack and then moves
+    /// it into the `SharedStaticCell`. If `T` is big, this is likely to cause stack overflows.
+    /// Considering using [`SharedStaticCell::try_init_with`] instead, which will construct it in-place inside the `SharedStaticCell`.
+    ///
+    /// Will only return a Some(&'static T) when the `SharedStaticCell` was not yet initialized.
+    #[inline]
+    pub fn try_init(&'static self, val: T) -> Option<&'static T> {
+        self.try_init_with(|| val)
+    }
+
+    /// Try initializing the `SharedStaticCell` with the closure's return value, returning a shared reference to it.
+    ///
+    /// The advantage over [`SharedStaticCell::try_init`] is that this method allows the closure to construct
+    /// the `T` value in-place directly inside the `SharedStaticCell`, saving stack space.
+    ///
+    /// Will only return a Some(&'static T) when the `SharedStaticCell` was not yet initialized.
+    #[inline]
+    pub fn try_init_with(&'static self, val: impl FnOnce() -> T) -> Option<&'static T> {
+        self.try_uninit().map(|mu| {
+            let val_ref = &*mu.write(val());
+            self.state.store(Self::STATE_FULL, Ordering::Release);
+            val_ref
+        })
+    }
+
+    // Note that the state needs to be written to `STATE_FULL` by the caller before returning the reference, otherwise `get` will never succeed.
+    #[allow(clippy::mut_from_ref)]
+    fn try_uninit(&'static self) -> Option<&'static mut MaybeUninit<T>> {
+        if self
+            .state
+            .compare_exchange(
+                Self::STATE_EMPTY,
+                Self::STATE_INITIALIZING,
+                Ordering::Acquire,
+                Ordering::Relaxed,
+            )
+            .is_ok()
+        {
+            // SAFETY: We just checked that the value is not yet taken and marked it as taken.
+            let val = unsafe { &mut *self.val.get() };
+            Some(val)
+        } else {
+            None
+        }
+    }
+
+    /// Retrieves a shared reference to the data.
+    ///
+    /// # Panics
+    ///
+    /// This function will panic if the `SharedStaticCell` is not initialized.
+    #[inline]
+    pub fn get(&'static self) -> &'static T {
+        self.try_get().expect("SharedStaticCell is not initialized")
+    }
+
+    /// Attempts to retrieve a shared reference to the data.
+    ///
+    /// Returns `Some(&'static T)` if the `SharedStaticCell` is initialized, otherwise `None`.
+    #[inline]
+    pub fn try_get(&'static self) -> Option<&'static T> {
+        if self.state.load(Ordering::Acquire) == Self::STATE_FULL {
+            // SAFETY: We just checked that the value is initialized.
+            Some(unsafe { (&*self.val.get()).assume_init_ref() })
+        } else {
+            None
+        }
+    }
+}
+
 /// Convert a `T` to a `&'static mut T`.
 ///
 /// The macro declares a `static StaticCell` and then initializes it when run, returning the `&'static mut`.
@@ -251,13 +399,37 @@ macro_rules! make_static {
 
 #[cfg(test)]
 mod tests {
-    use crate::StaticCell;
+    use crate::{SharedStaticCell, StaticCell};
 
     #[test]
     fn test_static_cell() {
         static CELL: StaticCell<u32> = StaticCell::new();
         let val: &'static u32 = CELL.init(42u32);
         assert_eq!(*val, 42);
+    }
+
+    #[test]
+    fn test_shared_static_cell() {
+        static CELL: SharedStaticCell<u32> = SharedStaticCell::new();
+
+        let should_be_none = CELL.try_get();
+        assert!(should_be_none.is_none());
+
+        let val: &'static u32 = CELL.init(42u32);
+        assert_eq!(*val, 42);
+
+        let should_be_some = CELL.try_get();
+        assert_eq!(should_be_some, Some(&42));
+
+        let should_not_panic = CELL.get();
+        assert_eq!(*should_not_panic, 42);
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_shared_static_cell_panics_if_accessed_when_empty() {
+        static CELL: SharedStaticCell<u32> = SharedStaticCell::new();
+        CELL.get();
     }
 
     #[cfg(feature = "nightly")]
