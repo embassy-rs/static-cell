@@ -82,7 +82,8 @@ impl<T> StaticCell<T> {
         if let Some(val) = self.try_uninit() {
             val
         } else {
-            panic!("`StaticCell` is already full, it can't be initialized twice.");
+            let self_as_ptr = (&raw const *self);
+            panic!("`StaticCell`@{:#x} is already full, it can't be initialized twice.", self_as_ptr as usize);
         }
     }
 
@@ -187,7 +188,8 @@ impl<T> ConstStaticCell<T> {
         if let Some(val) = self.try_take() {
             val
         } else {
-            panic!("`ConstStaticCell` is already taken, it can't be taken twice")
+            let self_as_ptr = (&raw const *self);
+            panic!("`ConstStaticCell`@{:#x} is already taken, it can't be taken twice", self_as_ptr as usize)
         }
     }
 
