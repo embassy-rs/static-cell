@@ -37,9 +37,13 @@ assert_eq!(*x, 42);
 
 ## Interoperability
 
-This crate uses [`portable-atomic`](https://crates.io/crates/portable-atomic), so on targets without native
-atomics you must import a crate that provides a [`critical-section`](https://github.com/rust-embedded/critical-section) 
+The `portable-atomic` feature is enabled by default. With it, this crate uses
+[`portable-atomic`](https://crates.io/crates/portable-atomic), so on targets without native
+atomics you must import a crate that provides a [`critical-section`](https://github.com/rust-embedded/critical-section)
 implementation. See the `critical-section` README for details.
+
+Disable `portable-atomic` to use [`core::sync::atomic`](https://doc.rust-lang.org/core/sync/atomic/)
+on targets that provide native atomics.
 
 ## Minimum Supported Rust Version (MSRV)
 
