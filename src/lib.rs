@@ -6,6 +6,10 @@
 use core::cell::UnsafeCell;
 use core::mem::MaybeUninit;
 
+#[cfg(not(feature = "portable-atomic"))]
+use core::sync::atomic::{AtomicBool, Ordering};
+
+#[cfg(feature = "portable-atomic")]
 use portable_atomic::{AtomicBool, Ordering};
 
 /// Statically allocated, initialized at runtime cell.
